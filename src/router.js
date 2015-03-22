@@ -14,19 +14,37 @@ var _ = require('underscore'),
  * Prototype
  */
 
-var Router = module.exports = function(app) {
+var Router = module.exports = function(app, db) {
     
     this.app = app;
+    this.db = db;
 
     this.app.get('/', this.hello);
-    this.app.get('/count', this.count);
-    this.app.get('/question/:question', this.getQuestion);
-    this.app.put('/question', this.updateQuestion);
-    this.app.post('/question', this.createQuestion);
-    this.app.post('/question', this.deleteQuestion);
+    this.app.get('/count', this.bindHandler(this.count));
+    this.app.get('/question/:question', this.bindHandler(this.getQuestion));
+    this.app.put('/question/:question', this.bindHandler(this.updateQuestion));
+    this.app.post('/question/:question', this.bindHandler(this.createQuestion));
+    this.app.post('/question/:question', this.bindHandler(this.deleteQuestion));
 
     this.setupRoutes();
 
+};
+
+
+/**
+ * Returns a route handler that has been bound with the proper context
+ *
+ * @api private
+ */
+
+Router.prototype.bindHandler = function(handler) {
+    var _this = this;
+
+    var boundHandler = function() {
+        handler.apply(_this, arguments);
+    };
+
+    return boundHandler;
 };
 
 
@@ -67,7 +85,7 @@ Router.prototype.hello = function(req, res) {
  */
 
 Router.prototype.count = function(req, res) {
-    Question.count(function(err, count) {
+    this.db.Question.count(function(err, count) {
         if(err === null) {
             res.status(200).json({count: count});
         } else {
@@ -86,7 +104,7 @@ Router.prototype.count = function(req, res) {
  */
 
 Router.prototype.getQuestion = function(req, res) {
-    Question.findOne({question: req.params.question}, function(err, question) {
+    this.db.Question.findOne({question: req.params.question}, function(err, question) {
         if(err === null) {
             res.status(200).json(question);
         } else {
@@ -112,19 +130,28 @@ Router.prototype.createQuestion = function(req, res) {
        questionData.operator === undefined) {
 
         var importer = new Importer(),
+            parsedQuestion = {};
+
+        // Parsing an improperly formed question may throw an exception, so we try/catch
+        try {
             parsedQuestion = importer.parseQuestionString(questionData.question);
+        } catch(exception) {
+            var err = 'Improperly formed question string - the expected format is ' + 
+                      '"What is [first number] [operator] [second number]?';
+
+            return res.status(500).json({err: err});
+        }
 
         questionData.operator = parsedQuestion.operator;
         questionData.firstNumber = parsedQuestion.firstNumber;
         questionData.secondNumber = parsedQuestion.secondNumber;
     }
 
-    var question = new Question(questionData);
+    var question = new this.db.Question(questionData);
     question.save(function(err) {
         if(err === null) {
             res.status(200).json({ok: true});
         } else {
-            console.log(err);
             res.status(500).json({err: err});
         }
     });
@@ -140,7 +167,30 @@ Router.prototype.createQuestion = function(req, res) {
  */
 
 Router.prototype.updateQuestion = function(req, res) {
-    
+    var update = req.body,
+        query = this.getUniqueQuery(req);
+
+    // In order to pass our update through validation, we find the object being referred to, apply
+    // our update, and call .save() on it, so that Mongoose's internal middleware is engaged
+    this.db.Question.findOne(query, {$set: update}, function(err, doc) {
+        if(err) {
+            res.status(500).json({err: err});
+        } else if(doc === null) {
+            res.status(404).json({err: 'no such document'});
+        } else {
+            // Apply our update to the document
+            _.extend(doc, update);
+
+            // Save our changes
+            doc.save(function(err) {
+                if(err) {
+                    res.json(500).json({err: err});
+                } else {
+                    res.status(200).json({ok: true});
+                }
+            });
+        }
+    });
 };
 
 
@@ -153,7 +203,7 @@ Router.prototype.updateQuestion = function(req, res) {
  */
 
 Router.prototype.deleteQuestion = function(req, res) {
-    Question.findOne({question: req.params.question}, function(err, question) {
+    this.db.Question.findOneAndRemove({question: req.params.question}, function(err, question) {
         if(err === null) {
             if(question === null) {
                 res.status(500).json({err: 'Failed to find question ' + req.params.question});
@@ -171,4 +221,30 @@ Router.prototype.deleteQuestion = function(req, res) {
             res.status(500).json({err: err});
         }
     });
+};
+
+
+/**
+ * Get the uniquely identifying query being specified in a request's parameters
+ *
+ * @param {Object} express request object
+ * @api private
+ */
+
+Router.prototype.getUniqueQuery = function(req) {
+    var params = req.params,
+        query = {};
+
+    if(params.question !== undefined) {
+        query.question = params.question;
+    } else if(params.firstNumber !== undefined && 
+              params.secondNumber !== undefined && 
+              params.operator !== undefined) {
+
+        query.operator = params.operator;
+        query.firstNumber = params.firstNumber;
+        query.secondNumber = params.secondNumber;
+    }
+
+    return query;
 };

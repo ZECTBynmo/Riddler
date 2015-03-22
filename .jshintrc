@@ -1,4 +1,5 @@
 {
     "node": true,
+    "unused": "vars",
     "quotmark": false
 }

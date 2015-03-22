@@ -6,8 +6,7 @@
  */
 
 var _ = require('underscore'),
-    fs = require('fs'),
-    Question = require('./db').Question;
+    fs = require('fs');
 
 
 /**
@@ -28,9 +27,10 @@ var QUESTION_INDEX_FIRST_NUMBER = 2,
  * Prototype
  */
 
-var Importer = module.exports = function(options) {
+var Importer = module.exports = function(db) {
     
-    this.options = options || {};
+    // Importer can be instantiated and used for raw question string parsing even with undefined db
+    this.db = db;
 
 };
 
@@ -55,7 +55,7 @@ Importer.prototype.import = function(path, callback) {
 
         var questionData = _this.parseLine(line);
 
-        Question.findOneAndUpdate({
+        _this.db.Question.findOneAndUpdate({
             question: questionData.question
         }, questionData, {upsert: true}, function(err) {
             if(err) {

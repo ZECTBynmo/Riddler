@@ -5,7 +5,8 @@
  * Module dependencies.
  */
 
-var config = require('../config').db,
+var _ = require('underscore'),
+    config = require('../config').db,
     mongoose = require('mongoose');
 
 
@@ -13,75 +14,116 @@ var config = require('../config').db,
  * Namespace
  */
 
-var connection = mongoose.createConnection('mongodb://' + config.host + '/' + config.database);
 var OPERATORS = ['+', '-', '*', '/'];
 
-
 /**
- * Schemas
+ * Prototype
  */
 
-var QuestionSchema = mongoose.Schema({
-    // The list of wrong answers used to distract users
-    distractors: {
-        type: Array,
-        required: true
-    },
-    
-    // Full question, our unique key, indexed for speed
-    question: {
-        type: String,
-        index:  {unique: true},
-        unique: true,
-        required: true,
-    },
-    
-    // The first number in the question
-    firstNumber: {
-        type: Number,
-        required: true,
-    },
-    
-    // The operator we're performing in this question
-    operator: {
-        type: String,
-        required: true,
-    },
-    
-    // The second number in the question
-    secondNumber: {
-        type: Number,
-        required: true,
-    },
-    
-    // The answer to the question
-    answer: {
-        type: Number,
-        required: true,
-    },
-});
+var Database = module.exports = function(importer) {
+
+    this.uri = 'mongodb://' + config.host + '/' + config.database;
+    this.importer = importer;
+    this.connection = mongoose.createConnection(this.uri);
+
+    /**
+     * Schemas
+     */
+
+    this.QuestionSchema = mongoose.Schema({
+        // The list of wrong answers used to distract users
+        distractors: {
+            type: Array,
+            required: true
+        },
+        
+        // Full question, our unique key, indexed for speed
+        question: {
+            type: String,
+            index:  {unique: true},
+            unique: true,
+            required: true,
+        },
+        
+        // The first number in the question
+        firstNumber: {
+            type: Number,
+            required: true,
+        },
+        
+        // The operator we're performing in this question
+        operator: {
+            type: String,
+            required: true,
+        },
+        
+        // The second number in the question
+        secondNumber: {
+            type: Number,
+            required: true,
+        },
+        
+        // The answer to the question
+        answer: {
+            type: Number,
+            required: true,
+        },
+    });
+
+    /**
+     * Models
+     */
+
+    this.Question = this.connection.model('Question', this.QuestionSchema);
+    this.Question.schema.path('answer').validate(this.bind(this.validateAnswer));
+    this.Question.schema.path('operator').validate(this.bind(this.validateOperator));
+    this.Question.schema.path('question').validate(this.bind(this.validateQuestion));
+    this.Question.schema.path('distractors').validate(this.bind(this.validateDistractors));
+
+};
 
 
 /**
- * Models
+ * Returns a validator/function that has been bound with the proper context
+ *
+ * @api private
  */
 
-var Question = connection.model('Question', QuestionSchema);
+Database.prototype.bind = function(fn) {
+    var _this = this;
 
-// Validators
-Question.schema.path('operator').validate(function(value) {
-    return OPERATORS.indexOf(value) != -1;
-});
+    var boundHandler = function(value) {
+        return fn.call(this, value, _this);
+    };
 
-Question.schema.path('distractors').validate(function(value) {
-    console.log("VALIDATING");
-    var isArray = value.constructor === Array,
-        hasNumbers = true;
+    return boundHandler;
+};
+
+
+/**
+ * Validate distractor array
+ *
+ * @param {Array} series of distractors
+ * @api private
+ */
+
+Database.prototype.validateDistractors = function(distractors) {
+    var isArray = distractors.constructor === Array,
+        doesRepeat = false,
+        hasNumbers = true,
+        histogram = {};
+
 
     if(!isArray) {
         return false;
     } else {
-        value.every(function(distractor) {
+        _.each(distractors, function(distractor) {
+            if(histogram[distractor] === undefined) {
+                histogram[distractor] = true;
+            } else {
+                doesRepeat = true;
+            }
+
             if(distractor.constructor !== Number) {
                 hasNumbers = false;
                 return false;
@@ -89,16 +131,50 @@ Question.schema.path('distractors').validate(function(value) {
         });
     }
 
-    return isArray && hasNumbers;
-});
-
-
+    return isArray && hasNumbers && !doesRepeat;
+};
 
 
 /**
- * Exports
+ * Validate question
+ *
+ * @param {String} operator string (+, -, *, or /)
+ * @param {Object} Database instance for execution context
+ * @api private
  */
 
-module.exports = {
-    Question: Question,
+Database.prototype.validateQuestion = function(question, _this) {
+    try {
+        _this.importer.parseQuestionString(question);
+        return true;
+    } catch(exception) {
+        return false;
+    }
+};
+
+
+/**
+ * Validate operator
+ *
+ * @param {String} operator string (+, -, *, or /)
+ * @api private
+ */
+
+Database.prototype.validateOperator = function(operator) {
+    return OPERATORS.indexOf(operator) != -1;
+};
+
+
+/**
+ * Validate answer
+ *
+ * @param {Number} question answer
+ * @api private
+ */
+
+Database.prototype.validateAnswer = function(answer) {
+    var isNumber = answer.constructor === Number,
+        isCorrect = answer == this.firstNumber + this.secondNumber;
+
+    return isNumber && isCorrect;
 };
