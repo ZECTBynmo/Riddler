@@ -7,7 +7,8 @@
 
 var _ = require('underscore'),
     config = require('../config').db,
-    mongoose = require('mongoose');
+    mongoose = require('mongoose'),
+    Importer = require('./importer');
 
 
 /**
@@ -23,7 +24,7 @@ var OPERATORS = ['+', '-', '*', '/'];
 var Database = module.exports = function(importer) {
 
     this.uri = 'mongodb://' + config.host + '/' + config.database;
-    this.importer = importer;
+    this.importer = new Importer();
     this.connection = mongoose.createConnection(this.uri);
 
     /**

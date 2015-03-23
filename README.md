@@ -75,13 +75,14 @@ Optional query parameters
 first           // The first number in the question
 second          // The second number in the question
 answer          // The answer to the question
+operator        // The operator in the question
 range           // 'gt' finds questions greater than your first/second/answer/etc., or 'lt' for less than
 distractor      // Find items where this distractor is present
 numDistractors  // Find items with this number of distractors
 
 // Pagination parameters
 page            // Which page of data to show (defaults to 0)
-perPage         // Number of results per page (defaults to 250)
+per_page        // Number of results per page (defaults to 250)
 sort_by         // Which parameter to sort by (options are the selection parameters, defaults to nothing)
 order           // The sort order ('asc' for ascending, or 'des' for descending, defaults to ascending)
 ```

@@ -23,11 +23,11 @@ var Server = module.exports = function(options) {
     options = options || {};
 
     this.port = options.port || config.port;
+    this.db = new Database();
     this.importer = new Importer(this.db);
-    this.db = new Database(this.importer);
     
     this.app = express();
-//    this.app.use(morgan('dev'));
+    this.app.use(morgan('dev'));
     this.app.use(bodyParser.json());
     this.app.use(bodyParser.urlencoded({extended: false}));
 

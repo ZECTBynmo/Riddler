@@ -123,6 +123,10 @@ describe('Server', function() {
                 });
         });
 
+    });
+
+    describe('GET', function() {
+
         it('should return the current count of questions', function(done) {
             var port = 22222,
                 server = new Server({port: port});
@@ -162,6 +166,28 @@ describe('Server', function() {
                 });
         });
 
+        it('should fetch all questions', function(done) {
+            var port = 25234,
+                server = new Server({port: port});
+
+            supertest(server.app)
+                .get('/question')
+                .expect(200)
+                .end(function(err, res) {
+                    if(err) {
+                        done(err);
+                    } else if(res.body.constructor !== Array) {
+                        done('Failed to fetch question');
+                    } else {
+                        done();
+                    }
+                });
+        });
+
+    });
+
+    describe('POST', function() {
+
         it('should create a question', function(done) {
             var port = 44444,
                 server = new Server({port: port}),
@@ -176,6 +202,43 @@ describe('Server', function() {
             };
 
             server.db.Question.findOneAndRemove({question: question}, function() {
+                supertest(server.app)
+                    .post(questionUrl)
+                    .send(questionData)
+                    .expect(200)
+                    .end(function(err, res) {
+                        if(err) {
+                            done(err);
+                        } else {
+                            done();
+                        }
+                    });
+            });
+        });
+
+        it('should create a question by components', function(done) {
+            var port = 12456,
+                server = new Server({port: port});
+
+            var questionData = {
+                distractors: [5, 6, 8],
+                firstNumber: 1,
+                secondNumber: 1,
+                operator: '+',
+                answer: 2,
+            };
+
+            var questionUrl = '/question/first/' + questionData.firstNumber + 
+                              '/operator/' + questionData.operator +
+                              '/second/' + questionData.secondNumber;
+
+            var query = {
+                firstNumber: questionData.firstNumber,
+                secondNumber: questionData.secondNumber,
+                operator: questionData.operator
+            };
+
+            server.db.Question.findOneAndRemove(query, function() {
                 supertest(server.app)
                     .post(questionUrl)
                     .send(questionData)
@@ -260,6 +323,169 @@ describe('Server', function() {
                     .post(questionUrl)
                     .send(questionData)
                     .expect(500)
+                    .end(function(err, res) {
+                        if(err) {
+                            done(err);
+                        } else {
+                            done();
+                        }
+                    });
+            });
+        });
+
+    });
+
+    describe('PUT', function() {
+
+        it('should update a question', function(done) {
+            var port = 10101,
+                server = new Server({port: port}),
+                question = 'What is 1 + 1?',
+                escapedQuestion = encodeURIComponent(question),
+                questionUrl = '/question/' + escapedQuestion;
+
+            var questionData = {
+                distractors: [5, 6, 8],
+                firstNumber: 1,
+                secondNumber: 1,
+                operator: '+',
+                question: question,
+                answer: 2,
+            };
+
+            var query = {
+                question: question
+            };
+
+            var update = {
+                distractors: [1, 4, 8]
+            };
+
+            server.db.Question.update(query, questionData, {upsert: true}, function() {
+                supertest(server.app)
+                    .put(questionUrl)
+                    .send(update)
+                    .expect(200)
+                    .end(function(err, res) {
+                        if(err) {
+                            done(err);
+                        } else {
+                            done();
+                        }
+                    });
+            });
+        });
+
+        it('should update a question by components', function(done) {
+            var port = 10101,
+                server = new Server({port: port}),
+                question = 'What is 1 + 1?';
+
+            var questionData = {
+                distractors: [5, 6, 8],
+                firstNumber: 1,
+                secondNumber: 1,
+                operator: '+',
+                question: question,
+                answer: 2,
+            };
+
+            var questionUrl = '/question/first/' + questionData.firstNumber + 
+                              '/operator/' + questionData.operator +
+                              '/second/' + questionData.secondNumber;
+
+            var query = {
+                question: question
+            };
+
+            var update = {
+                distractors: [1, 4, 8]
+            };
+
+            server.db.Question.update(query, questionData, {upsert: true}, function() {
+                supertest(server.app)
+                    .put(questionUrl)
+                    .send(update)
+                    .expect(200)
+                    .end(function(err, res) {
+                        if(err) {
+                            done(err);
+                        } else {
+                            done();
+                        }
+                    });
+            });
+        });
+
+        it('should fail update with a wrong answer (should validate)', function(done) {
+            var port = 10101,
+                server = new Server({port: port}),
+                question = 'What is 1 + 1?';
+
+            var questionData = {
+                distractors: [5, 6, 8],
+                firstNumber: 1,
+                secondNumber: 1,
+                operator: '+',
+                question: question,
+                answer: 2,
+            };
+
+            var questionUrl = '/question/first/' + questionData.firstNumber + 
+                              '/operator/' + questionData.operator +
+                              '/second/' + questionData.secondNumber;
+
+            var query = {
+                question: question
+            };
+
+            var update = {
+                answer: 5
+            };
+
+            server.db.Question.update(query, questionData, {upsert: true}, function() {
+                supertest(server.app)
+                    .put(questionUrl)
+                    .send(update)
+                    .expect(500)
+                    .end(function(err, res) {
+                        if(err) {
+                            done(err);
+                        } else {
+                            done();
+                        }
+                    });
+            });
+        });
+
+    });
+
+    describe('DELETE', function() {
+
+        it('should delete a question', function(done) {
+            var port = 10101,
+                server = new Server({port: port}),
+                question = 'What is 1 + 1?',
+                escapedQuestion = encodeURIComponent(question),
+                questionUrl = '/question/' + escapedQuestion;
+
+            var questionData = {
+                distractors: [5, 6, 8],
+                firstNumber: 1,
+                secondNumber: 1,
+                operator: '+',
+                question: question,
+                answer: 2,
+            };
+
+            var query = {
+                question: question
+            };
+
+            server.db.Question.update(query, questionData, {upsert: true}, function() {
+                supertest(server.app)
+                    .delete(questionUrl)
+                    .expect(200)
                     .end(function(err, res) {
                         if(err) {
                             done(err);

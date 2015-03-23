@@ -6,8 +6,7 @@
  */
 
 var _ = require('underscore'),
-    Importer = require('./importer'),
-    Question = require('./db').Question;
+    Importer = require('./importer');
 
 
 /**
@@ -21,12 +20,17 @@ var Router = module.exports = function(app, db) {
 
     this.app.get('/', this.hello);
     this.app.get('/count', this.bindHandler(this.count));
+    this.app.get('/question', this.bindHandler(this.getQuestions));
     this.app.get('/question/:question', this.bindHandler(this.getQuestion));
-    this.app.put('/question/:question', this.bindHandler(this.updateQuestion));
-    this.app.post('/question/:question', this.bindHandler(this.createQuestion));
-    this.app.post('/question/:question', this.bindHandler(this.deleteQuestion));
 
-    this.setupRoutes();
+    this.app.put('/question/:question', this.bindHandler(this.updateQuestion));
+    this.app.put('/question/first/:firstNumber/operator/:operator/second/:secondNumber', this.bindHandler(this.updateQuestion));
+    
+    this.app.post('/question/:question', this.bindHandler(this.createQuestion));
+    this.app.post('/question/first/:firstNumber/operator/:operator/second/:secondNumber', this.bindHandler(this.createQuestion));
+    
+    this.app.delete('/question/:question', this.bindHandler(this.deleteQuestion));
+    this.app.delete('/question/first/:firstNumber/operator/:operator/second/:secondNumber', this.bindHandler(this.deleteQuestion));
 
 };
 
@@ -45,21 +49,6 @@ Router.prototype.bindHandler = function(handler) {
     };
 
     return boundHandler;
-};
-
-
-/**
- * Setup our routes
- *
- * @api private
- */
-
-Router.prototype.setupRoutes = function() {
-    var _this = this;
-
-    _.each(this.routes, function(handler, route) {
-        _this.app.get(route, handler);
-    });
 };
 
 
@@ -85,7 +74,9 @@ Router.prototype.hello = function(req, res) {
  */
 
 Router.prototype.count = function(req, res) {
-    this.db.Question.count(function(err, count) {
+    var query = this.getQuery(req);
+
+    this.db.Question.count(query, function(err, count) {
         if(err === null) {
             res.status(200).json({count: count});
         } else {
@@ -96,7 +87,7 @@ Router.prototype.count = function(req, res) {
 
 
 /**
- * Find questions by question string
+ * Fetch a single question
  *
  * @param {Object} express request object
  * @param {Object} express response object
@@ -111,6 +102,89 @@ Router.prototype.getQuestion = function(req, res) {
             res.status(500).json({err: err});
         }
     });
+};
+
+
+/**
+ * Build a query for a given request
+ *
+ * @param {Object} express request
+ * @api private
+ */
+
+Router.prototype.getQuery = function(req) {
+    var query = {};
+
+    function addToQuery(param, queryName) {
+        if(req.query[param] !== undefined) {
+            if(req.query.range !== undefined && param != 'operator') {
+                if(req.query.range == 'gt') {
+                    query[queryName] = {$gt: req.query[param]};
+                } else {
+                    query[queryName] = {$lt: req.query[param]};
+                }
+            } else {
+                query[queryName] = req.query[param];
+            }
+        }
+    }
+
+    addToQuery('first', 'firstNumber');
+    addToQuery('answer', 'answer');
+    addToQuery('second', 'secondNumber');
+    addToQuery('operator', 'operator');
+
+    if(req.query.distractor !== undefined) {
+        var distractor = Number(req.query.distractor);
+        if(req.query.numDistractors !== undefined) {
+            query.distractors = {$and: 
+                [
+                    {$in: [distractor]},
+                    {$size: req.query.numDistractors}
+                ]
+            };
+        } else {
+            query.distractors = {$in: [distractor]};
+        }
+    } else {
+        if(req.query.numDistractors !== undefined) {
+            query.distractors = {$size: req.query.numDistractors};
+        }
+    }
+
+    return query;
+};
+
+
+/**
+ * Fetch multiple questions by query
+ *
+ * @param {Object} express request object
+ * @param {Object} express response object
+ * @api private
+ */
+
+Router.prototype.getQuestions = function(req, res) {
+    var page = req.query.page || 0,
+        query = this.getQuery(req),
+        order = req.query.order || 'asc',
+        sortKey = req.query.sort_key || 'question',
+        pageSize = req.query.per_page || 250;
+
+    var sort = {};
+    sort[sortKey] = order == 'asc' ? 1 : -1;
+
+    this.db.Question.find(query)
+        .sort(sort)
+        .skip(page * pageSize)
+        .limit(pageSize)
+        .exec(function(err, questions) {
+            if(err) {
+                res.status(500).json({err: err});
+            } else {
+                res.status(200).json(questions);
+            }
+        });
 };
 
 
@@ -145,6 +219,9 @@ Router.prototype.createQuestion = function(req, res) {
         questionData.operator = parsedQuestion.operator;
         questionData.firstNumber = parsedQuestion.firstNumber;
         questionData.secondNumber = parsedQuestion.secondNumber;
+    } else if(questionData.question === undefined) {
+        questionData.question = 'What is ' + questionData.firstNumber + ' ' + 
+                                questionData.operator + ' ' + questionData.secondNumber;
     }
 
     var question = new this.db.Question(questionData);
@@ -172,7 +249,7 @@ Router.prototype.updateQuestion = function(req, res) {
 
     // In order to pass our update through validation, we find the object being referred to, apply
     // our update, and call .save() on it, so that Mongoose's internal middleware is engaged
-    this.db.Question.findOne(query, {$set: update}, function(err, doc) {
+    this.db.Question.findOne(query, function(err, doc) {
         if(err) {
             res.status(500).json({err: err});
         } else if(doc === null) {
@@ -184,7 +261,7 @@ Router.prototype.updateQuestion = function(req, res) {
             // Save our changes
             doc.save(function(err) {
                 if(err) {
-                    res.json(500).json({err: err});
+                    res.status(500).json({err: err});
                 } else {
                     res.status(200).json({ok: true});
                 }
