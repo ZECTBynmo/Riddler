@@ -22,7 +22,7 @@ var Server = module.exports = function(options) {
 
     options = options || {};
 
-    this.port = options.port || config.port;
+    this.port = process.env.PORT || options.port || config.port;
     this.db = new Database();
     this.importer = new Importer(this.db);
     
