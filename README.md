@@ -167,20 +167,35 @@ NOTE: The importer streams data from the questions file, so it can theoretically
 
 Many aspects of the server are covered by unit tests
 ```
-Importer
+  Importer
     #parseLine()
       ✓ should parse a single line of a questions file 
       ✓ should have all expected data 
       ✓ should turn numerical data into Numbers 
     #eachLine()
-      ✓ should open a file and iterate over its lines
-      
-      
-Server
+      ✓ should open a file and iterate over its lines 
+
+  Server
     #run()
-      ✓ should start up the server
-      ✓ should return the current count of questions
-      ✓ should fetch a question
-      ✓ should create a question
-      ✓ should update a question
+      ✓ should start up the server (60ms)
+    GET
+      ✓ should return the current count of questions 
+      ✓ should fetch a question 
+      ✓ should fetch all questions (55ms)
+    POST
+      ✓ should create a question (48ms)
+      ✓ should create a question by components 
+      ✓ should fail to create an improperly formed question 
+      ✓ should fail creation if the answer is wrong 
+      ✓ should fail creation if the distractors repeat 
+    PUT
+      ✓ should update a question 
+      ✓ should update a question by components 
+      ✓ should fail update with a wrong answer (should validate) 
+    DELETE
+      ✓ should delete a question 
+
+
+  17 passing (387ms)
+
 ```
