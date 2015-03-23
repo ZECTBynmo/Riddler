@@ -199,3 +199,7 @@ Many aspects of the server are covered by unit tests
   17 passing (387ms)
 
 ```
+To run the tests:
+```
+mocha
+```
