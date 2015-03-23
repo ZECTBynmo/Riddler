@@ -87,6 +87,12 @@ sort_by         // Which parameter to sort by (options are the selection paramet
 order           // The sort order ('asc' for ascending, or 'des' for descending, defaults to ascending)
 ```
 
+Get a count of questions
+```
+GET /count
+```
+To fetch the count of a subset of questions, use the same query parameter format as above
+
 #### POST - create new questions
 
 Available url formats:
