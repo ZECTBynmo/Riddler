@@ -23,7 +23,7 @@ var OPERATORS = ['+', '-', '*', '/'];
 
 var Database = module.exports = function(importer) {
 
-    this.uri = 'mongodb://' + config.host + '/' + config.database;
+    this.uri = process.env.MONGOLAB_URI || 'mongodb://' + config.host + '/' + config.database;
     this.importer = new Importer();
     this.connection = mongoose.createConnection(this.uri);
 
