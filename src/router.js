@@ -22,6 +22,7 @@ var Router = module.exports = function(app, db) {
     this.app.get('/count', this.bindHandler(this.count));
     this.app.get('/question', this.bindHandler(this.getQuestions));
     this.app.get('/question/:question', this.bindHandler(this.getQuestion));
+    this.app.get('/question/first/:firstNumber/operator/:operator/second/:secondNumber', this.bindHandler(this.getQuestion));
 
     this.app.put('/question/:question', this.bindHandler(this.updateQuestion));
     this.app.put('/question/first/:firstNumber/operator/:operator/second/:secondNumber', this.bindHandler(this.updateQuestion));
@@ -95,7 +96,9 @@ Router.prototype.count = function(req, res) {
  */
 
 Router.prototype.getQuestion = function(req, res) {
-    this.db.Question.findOne({question: req.params.question}, function(err, question) {
+    var query = this.getUniqueQuery(req);
+
+    this.db.Question.findOne(query, function(err, question) {
         if(err === null) {
             res.status(200).json(question);
         } else {
