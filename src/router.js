@@ -100,7 +100,11 @@ Router.prototype.getQuestion = function(req, res) {
 
     this.db.Question.findOne(query, function(err, question) {
         if(err === null) {
-            res.status(200).json(question);
+            if(question === null) {
+                res.status(404).json({message: 'no such question'});
+            } else {
+                res.status(200).json(question);
+            }
         } else {
             res.status(500).json({err: err});
         }
