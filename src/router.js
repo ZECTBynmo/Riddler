@@ -287,20 +287,21 @@ Router.prototype.updateQuestion = function(req, res) {
  */
 
 Router.prototype.deleteQuestion = function(req, res) {
-    this.db.Question.findOneAndRemove({question: req.params.question}, function(err, question) {
+    var query = this.getUniqueQuery(req);
+
+    this.db.Question.findOneAndRemove(query, function(err, question) {
         if(err === null) {
             if(question === null) {
-                res.status(500).json({err: 'Failed to find question ' + req.params.question});
-
-            }
-
-            question.remove(function(err) {
-                if(err) {
-                    res.status(500).json({err: err});
-                } else {
-                    res.status(200).json({ok: true});
-                }
-            });
+                res.status(404).json({err: 'Failed to find question ' + req.params.question});
+            } else {
+                question.remove(function(err) {
+                    if(err) {
+                        res.status(500).json({err: err});
+                    } else {
+                        res.status(200).json({ok: true});
+                    }
+                });
+            }            
         } else {
             res.status(500).json({err: err});
         }
